@@ -42,7 +42,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build --compile --target=bun --outfile=dist/imgpull ./bin/imgpull.js",
+    "build": "bun build --compile --target=bun --external react-devtools-core --outfile=dist/imgpull ./bin/imgpull.js",
     "release": "bun run build",
     "release:version": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1",
     "prepublishOnly": "echo 'Ready to publish to npm'"
@@ -55,5 +55,8 @@
     "ink-text-input": "^6.0.0",
     "react": "^19.2.7",
     "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "react-devtools-core": "^6.1.2"
   }
 }

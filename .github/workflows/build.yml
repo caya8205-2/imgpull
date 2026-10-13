@@ -75,7 +75,7 @@ jobs:
 
       - name: Build binary
         if: steps.check_release.outputs.exists == 'false'
-        run: bun build --compile --target=bun --outfile=dist/imgpull ./bin/imgpull.js
+        run: bun build --compile --target=bun --external react-devtools-core --outfile=dist/imgpull ./bin/imgpull.js
 
       - name: Rename artifacts for release
         if: steps.check_release.outputs.exists == 'false'
