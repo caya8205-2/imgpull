@@ -6,6 +6,7 @@ import Spinner from 'ink-spinner';
 import { LOSSY_FORMATS, processOne } from './lib.js';
 import { isInstagramPostUrl, parseNetscapeCookies } from './instagram.js';
 import { getDefaultOutput, getDefaultCookies, saveDefaultCookies } from './config.js';
+import { checkForUpdates } from './updater.js';
 
 const h = React.createElement;
 
@@ -23,12 +24,24 @@ const IG_SCOPE_ITEMS = [
   { label: 'Semua gambar carousel (Semuanya — Butuh cookie login IG)', value: 'all' },
 ];
 
-function Header() {
+function Header({ updateInfo }) {
   return h(
     Box,
-    { borderStyle: 'round', borderColor: 'cyan', paddingX: 2, marginBottom: 1 },
-    h(Text, { color: 'cyan', bold: true }, 'imgpull'),
-    h(Text, { dimColor: true }, '  — download & convert gambar dari URL'),
+    { flexDirection: 'column', marginBottom: 1 },
+    h(
+      Box,
+      { borderStyle: 'round', borderColor: 'cyan', paddingX: 2 },
+      h(Text, { color: 'cyan', bold: true }, 'imgpull'),
+      h(Text, { dimColor: true }, '  — download & convert gambar dari URL'),
+    ),
+    updateInfo
+      ? h(
+          Box,
+          { borderStyle: 'single', borderColor: 'yellow', paddingX: 1, marginTop: 1, flexDirection: 'column' },
+          h(Text, { color: 'yellow', bold: true }, `★ Update v${updateInfo.latest} tersedia! (versi saat ini: v${updateInfo.current})`),
+          h(Text, { color: 'cyan' }, `  Jalankan: ${updateInfo.command}`),
+        )
+      : null,
   );
 }
 
@@ -43,6 +56,7 @@ function StatusIcon({ status }) {
 function App() {
   const { exit } = useApp();
 
+  const [updateInfo, setUpdateInfo] = useState(null);
   const [step, setStep] = useState('urls');
   const [urls, setUrls] = useState([]);
   const [urlInput, setUrlInput] = useState('');
@@ -59,6 +73,12 @@ function App() {
       exit();
     }
   });
+
+  useEffect(() => {
+    checkForUpdates().then((info) => {
+      if (info) setUpdateInfo(info);
+    });
+  }, []);
 
   useEffect(() => {
     if (step !== 'downloading' || started) return;
@@ -158,7 +178,7 @@ function App() {
     setStep('downloading');
   };
 
-  const children = [h(Header, { key: 'header' })];
+  const children = [h(Header, { key: 'header', updateInfo })];
 
   if (step === 'urls') {
     children.push(

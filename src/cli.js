@@ -8,6 +8,7 @@ import {
   getDefaultCookies,
   saveDefaultCookies,
 } from './config.js';
+import { checkForUpdates, CURRENT_VERSION } from './updater.js';
 
 const c = {
   dim: (s) => `\x1b[2m${s}\x1b[0m`,
@@ -35,11 +36,18 @@ function askQuestion(query) {
 }
 
 export async function runCli(argv) {
+  const updateInfo = await checkForUpdates();
+  if (updateInfo) {
+    console.log(`${c.yellow('[UPDATE]')} v${updateInfo.latest} is available (current: v${updateInfo.current})`);
+    console.log(`${c.cyan('[INFO]')}   Run: ${updateInfo.command}\n`);
+  }
+
   const program = new Command();
 
   program
     .name('imgpull')
     .description('Download gambar dari URL, auto convert dari webp (atau format lain) ke format pilihan lo. Jalanin tanpa argumen buat mode TUI interaktif.')
+    .version(CURRENT_VERSION, '-v, --version', 'tampilkan versi saat ini')
     .argument('[urls...]', 'satu atau lebih URL gambar')
     .option('-f, --format <format>', `format output (${SUPPORTED_FORMATS.join(', ')})`, 'png')
     .option('-o, --output <dir>', 'folder output (default: imgpull, atau dari -s)')
