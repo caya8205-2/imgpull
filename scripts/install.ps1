@@ -56,7 +56,7 @@ if (Test-Path $BinPath) {
   Write-Host "  [U]ninstall   - remove imgpull"
   Write-Host "  [R]einstall   - overwrite files"
   Write-Host "  [C]ancel      - do nothing"
-  $key = (Read-Host "Choice").ToUpper()
+  $key = "$((Read-Host 'Choice'))".ToUpper()
   if ($key -eq 'U') { DoUninstall; return }
   if ($key -ne 'R') { Write-Host "Cancelled." -ForegroundColor Gray; return }
 }
