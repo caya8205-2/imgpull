@@ -1,6 +1,6 @@
 {
   "name": "imgpull",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "CLI buat download gambar dari URL langsung convert dari webp (atau format apapun) ke png/jpg/dll, tanpa perlu 3rd party downloader atau convert manual pake ImageMagick.",
   "type": "module",
   "bin": {
