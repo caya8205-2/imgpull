@@ -71,6 +71,10 @@ if (Test-Path $CmdPath) {
 Write-Host "Installing imgpull to $AppDir ..." -ForegroundColor Cyan
 if (-not (Test-Path $AppDir)) { New-Item -ItemType Directory -Path $AppDir -Force | Out-Null }
 
+# Clean up legacy broken binary if present
+$legacyExe = Join-Path $AppDir 'imgpull.exe'
+if (Test-Path $legacyExe) { Remove-Item $legacyExe -Force -ErrorAction SilentlyContinue }
+
 # Check if npm package exists or fallback to GitHub
 $pkgSpec = if ($Version -eq "latest") { "imgpull" } else { "imgpull@$Version" }
 $published = $false
