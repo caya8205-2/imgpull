@@ -2,12 +2,51 @@
   "name": "imgpull",
   "version": "1.0.0",
   "description": "CLI buat download gambar dari URL langsung convert dari webp (atau format apapun) ke png/jpg/dll, tanpa perlu 3rd party downloader atau convert manual pake ImageMagick.",
-  "bin": {
-    "imgpull": "bin/imgpull.js"
-  },
   "type": "module",
+  "bin": {
+    "imgpull": "./bin/imgpull.js"
+  },
   "main": "./bin/imgpull.js",
+  "author": "caya8205-2",
   "license": "MIT",
+  "keywords": [
+    "image",
+    "downloader",
+    "converter",
+    "webp",
+    "png",
+    "jpg",
+    "avif",
+    "sharp",
+    "cli",
+    "tui",
+    "ink",
+    "instagram"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caya8205-2/imgpull.git"
+  },
+  "bugs": {
+    "url": "https://github.com/caya8205-2/imgpull/issues"
+  },
+  "homepage": "https://github.com/caya8205-2/imgpull#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build --compile --target=bun --outfile=dist/imgpull ./bin/imgpull.js",
+    "release": "bun run build",
+    "release:version": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1",
+    "prepublishOnly": "echo 'Ready to publish to npm'"
+  },
   "dependencies": {
     "commander": "^12.1.0",
     "ink": "^7.1.0",
@@ -16,13 +55,5 @@
     "ink-text-input": "^6.0.0",
     "react": "^19.2.7",
     "sharp": "^0.33.5"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": ""
+  }
 }

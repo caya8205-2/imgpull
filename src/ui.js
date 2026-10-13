@@ -4,6 +4,8 @@ import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import Spinner from 'ink-spinner';
 import { LOSSY_FORMATS, processOne } from './lib.js';
+import { isInstagramPostUrl, parseNetscapeCookies } from './instagram.js';
+import { getDefaultOutput, getDefaultCookies, saveDefaultCookies } from './config.js';
 
 const h = React.createElement;
 
@@ -14,6 +16,11 @@ const FORMAT_ITEMS = [
   { label: 'avif  (lossy, paling kecil)', value: 'avif' },
   { label: 'tiff  (lossless, buat editing)', value: 'tiff' },
   { label: 'gif   (animasi/palette terbatas)', value: 'gif' },
+];
+
+const IG_SCOPE_ITEMS = [
+  { label: 'Gambar pertama saja (Cover / Thumbnail — Cepat & tanpa cookie)', value: 'first' },
+  { label: 'Semua gambar carousel (Semuanya — Butuh cookie login IG)', value: 'all' },
 ];
 
 function Header() {
@@ -39,9 +46,11 @@ function App() {
   const [step, setStep] = useState('urls');
   const [urls, setUrls] = useState([]);
   const [urlInput, setUrlInput] = useState('');
+  const [igScope, setIgScope] = useState('first');
+  const [cookieInput, setCookieInput] = useState(() => getDefaultCookies() || '');
   const [format, setFormat] = useState('png');
   const [qualityInput, setQualityInput] = useState('');
-  const [outputInput, setOutputInput] = useState('imgpull');
+  const [outputInput, setOutputInput] = useState(() => getDefaultOutput() || 'imgpull');
   const [results, setResults] = useState([]);
   const [started, setStarted] = useState(false);
 
@@ -54,18 +63,35 @@ function App() {
   useEffect(() => {
     if (step !== 'downloading' || started) return;
     setStarted(true);
-    setResults(urls.map((url) => ({ url, status: 'queued' })));
+    setResults(urls.map((url) => ({ url, status: 'queued', files: [] })));
 
     (async () => {
       const quality = qualityInput ? parseInt(qualityInput, 10) : undefined;
+      const allImages = igScope === 'all';
+      let resolvedCookies = null;
+      if (cookieInput && cookieInput.trim()) {
+        try {
+          resolvedCookies = parseNetscapeCookies(cookieInput.trim());
+        } catch {
+          // ignore error, will fall back
+        }
+      }
+
       for (let i = 0; i < urls.length; i += 1) {
         const url = urls[i];
         setResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: 'downloading' } : r)));
         try {
           // eslint-disable-next-line no-await-in-loop
-          const result = await processOne(url, { format, output: outputInput, quality });
+          const fileResults = await processOne(url, {
+            format,
+            output: outputInput,
+            quality,
+            allImages,
+            cookies: resolvedCookies,
+          });
+
           setResults((prev) =>
-            prev.map((r, idx) => (idx === i ? { ...r, status: 'done', ...result } : r)),
+            prev.map((r, idx) => (idx === i ? { ...r, status: 'done', files: fileResults } : r)),
           );
         } catch (err) {
           setResults((prev) =>
@@ -75,16 +101,45 @@ function App() {
       }
       setStep('done');
     })();
-  }, [step, started, urls, format, qualityInput, outputInput]);
+  }, [step, started, urls, format, qualityInput, outputInput, igScope, cookieInput]);
 
   const handleUrlSubmit = (value) => {
     const trimmed = value.trim();
     if (trimmed === '') {
-      if (urls.length > 0) setStep('format');
+      if (urls.length > 0) {
+        const hasIg = urls.some(isInstagramPostUrl);
+        if (hasIg) {
+          setStep('ig-scope');
+        } else {
+          setStep('format');
+        }
+      }
       return;
     }
     setUrls((prev) => [...prev, trimmed]);
     setUrlInput('');
+  };
+
+  const handleIgScopeSelect = (item) => {
+    setIgScope(item.value);
+    if (item.value === 'all' && !getDefaultCookies()) {
+      setStep('ig-cookie');
+    } else {
+      setStep('format');
+    }
+  };
+
+  const handleCookieSubmit = (value) => {
+    const trimmed = value.trim();
+    if (trimmed) {
+      setCookieInput(trimmed);
+      try {
+        saveDefaultCookies(trimmed);
+      } catch {
+        // optional save
+      }
+    }
+    setStep('format');
   };
 
   const handleFormatSelect = (item) => {
@@ -117,6 +172,22 @@ function App() {
         h(TextInput, { value: urlInput, onChange: setUrlInput, onSubmit: handleUrlSubmit }),
       ),
     );
+  } else if (step === 'ig-scope') {
+    children.push(
+      h(Box, { key: 'ig-scope-box', flexDirection: 'column', marginBottom: 1 },
+        h(Text, { color: 'yellow', bold: true }, 'Postingan Instagram terdeteksi!'),
+        h(Text, { color: 'cyan', marginBottom: 1 }, 'Mau download gambar pertama atau semuanya?'),
+        h(SelectInput, { items: IG_SCOPE_ITEMS, onSelect: handleIgScopeSelect }),
+      ),
+    );
+  } else if (step === 'ig-cookie') {
+    children.push(
+      h(Box, { key: 'ig-cookie-box', flexDirection: 'column' },
+        h(Text, { color: 'cyan' }, 'Path file cookie Netscape (.txt) untuk download semua slide carousel:'),
+        h(Text, { dimColor: true }, '(Kosongkan / tekan Enter untuk lewati)'),
+        h(TextInput, { value: cookieInput, onChange: setCookieInput, onSubmit: handleCookieSubmit }),
+      ),
+    );
   } else if (step === 'format') {
     children.push(
       h(Text, { key: 'format-label', color: 'cyan' }, `${urls.length} URL siap. Pilih format output:`),
@@ -140,24 +211,33 @@ function App() {
     children.push(
       h(Box, { key: 'progress', flexDirection: 'column', marginBottom: 1 },
         results.map((r, i) =>
-          h(Box, { key: i },
-            h(StatusIcon, { status: r.status }),
-            h(Text, null, ' '),
-            h(Text, r.status === 'error' ? { color: 'red' } : {}, r.url),
-            r.status === 'done'
-              ? h(Text, { dimColor: true }, `  -> ${r.outPath} (${(r.sizeBytes / 1024).toFixed(1)} KB${r.usedConversion ? `, ${r.sourceExt}->${r.targetFormat}` : ''})`)
+          h(Box, { key: i, flexDirection: 'column', marginBottom: 1 },
+            h(Box, null,
+              h(StatusIcon, { status: r.status }),
+              h(Text, null, ' '),
+              h(Text, r.status === 'error' ? { color: 'red' } : { color: 'cyan' }, r.url),
+            ),
+            r.status === 'done' && r.files
+              ? r.files.map((f, fi) =>
+                  h(Box, { key: fi, marginLeft: 2, flexDirection: 'column' },
+                    h(Text, { dimColor: true },
+                      `↳ ${f.outPath} (${(f.sizeBytes / 1024).toFixed(1)} KB${f.usedConversion ? `, ${f.sourceExt}->${f.targetFormat}` : ''})`,
+                    ),
+                    f.warning ? h(Text, { color: 'yellow' }, `  ⚠ ${f.warning}`) : null,
+                  ),
+                )
               : null,
-            r.status === 'error' ? h(Text, { color: 'red' }, `  ${r.message}`) : null,
+            r.status === 'error' ? h(Box, { marginLeft: 2 }, h(Text, { color: 'red' }, `✘ ${r.message}`)) : null,
           ),
         ),
       ),
     );
     if (step === 'done') {
-      const ok = results.filter((r) => r.status === 'done').length;
+      const totalOk = results.reduce((acc, r) => acc + (r.files ? r.files.length : 0), 0);
       const fail = results.filter((r) => r.status === 'error').length;
       children.push(
         h(Text, { key: 'summary', color: 'cyan', bold: true },
-          `Selesai: ${ok} berhasil, ${fail} gagal.  `,
+          `Selesai: ${totalOk} gambar berhasil diunduh, ${fail} URL gagal.  `,
           h(Text, { dimColor: true }, '(Enter / q buat keluar)'),
         ),
       );

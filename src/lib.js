@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
+import { resolveInstagramImage, isInstagramPostUrl, extractShortcode } from './instagram.js';
 
 export const SUPPORTED_FORMATS = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'tiff', 'gif'];
 export const LOSSY_FORMATS = ['jpeg', 'webp', 'avif', 'tiff'];
@@ -76,45 +77,78 @@ export async function downloadBuffer(url) {
 
 /**
  * Download + convert one image.
- * opts: { format, output, name, quality }
- * returns { outPath, sourceExt, targetFormat, sizeBytes, usedConversion }
+ * opts: { format, output, name, quality, allImages }
+ * returns [{ outPath, sourceExt, targetFormat, sizeBytes, usedConversion, sourceLabel? }]
  */
 export async function processOne(url, opts) {
   const targetFormat = normalizeFormat(opts.format);
   const sharpFormat = targetFormat === 'jpg' ? 'jpeg' : targetFormat;
 
-  const { buffer, contentType } = await downloadBuffer(url);
+  let imageUrls = [];
+  let igMeta = null;
 
-  const sourceExt = guessExtFromContentType(contentType) || guessExtFromUrl(url) || 'bin';
-  const baseName = opts.name || guessNameFromUrl(url);
-
-  fs.mkdirSync(opts.output, { recursive: true });
-
-  let finalBuffer = buffer;
-  let usedConversion = false;
-
-  if (sourceExt !== targetFormat) {
-    const formatOpts = {};
-    if (opts.quality && LOSSY_FORMATS.includes(sharpFormat)) {
-      formatOpts.quality = opts.quality;
-    }
-    finalBuffer = await sharp(buffer).toFormat(sharpFormat, formatOpts).toBuffer();
-    usedConversion = true;
-  } else if (opts.quality && LOSSY_FORMATS.includes(sharpFormat)) {
-    finalBuffer = await sharp(buffer).toFormat(sharpFormat, { quality: opts.quality }).toBuffer();
-    usedConversion = true;
+  if (isInstagramPostUrl(url)) {
+    igMeta = await resolveInstagramImage(url, { allImages: opts.allImages, cookies: opts.cookies });
+    imageUrls = igMeta.imageUrls;
+  } else {
+    imageUrls = [url];
   }
 
-  const outPath = uniquePath(opts.output, baseName, targetFormat);
-  fs.writeFileSync(outPath, finalBuffer);
+  const results = [];
 
-  return {
-    outPath,
-    sourceExt,
-    targetFormat,
-    sizeBytes: finalBuffer.length,
-    usedConversion,
-  };
+  for (let i = 0; i < imageUrls.length; i++) {
+    const imgUrl = imageUrls[i];
+    const { buffer, contentType } = await downloadBuffer(imgUrl);
+    const sourceExt =
+      guessExtFromContentType(contentType) || guessExtFromUrl(imgUrl) || 'bin';
+
+    // naming: if IG multi-image, append index
+    let baseName;
+    if (opts.name) {
+      baseName = imageUrls.length > 1 && i > 0
+        ? `${opts.name}-${i + 1}`
+        : opts.name;
+    } else if (igMeta) {
+      const suffix = imageUrls.length > 1 ? `-${i + 1}` : '';
+      baseName = `ig-${igMeta.author || 'post'}-${extractShortcode(url)}${suffix}`;
+    } else {
+      baseName = imageUrls.length > 1 && i > 0
+        ? `${guessNameFromUrl(imgUrl)}-${i + 1}`
+        : guessNameFromUrl(imgUrl);
+    }
+
+    fs.mkdirSync(opts.output, { recursive: true });
+    const outPath = uniquePath(opts.output, baseName, targetFormat);
+
+    let finalBuffer = buffer;
+    let usedConversion = false;
+
+    if (sourceExt !== targetFormat) {
+      const formatOpts = {};
+      if (opts.quality && LOSSY_FORMATS.includes(sharpFormat)) {
+        formatOpts.quality = opts.quality;
+      }
+      finalBuffer = await sharp(buffer).toFormat(sharpFormat, formatOpts).toBuffer();
+      usedConversion = true;
+    } else if (opts.quality && LOSSY_FORMATS.includes(sharpFormat)) {
+      finalBuffer = await sharp(buffer).toFormat(sharpFormat, { quality: opts.quality }).toBuffer();
+      usedConversion = true;
+    }
+
+    fs.writeFileSync(outPath, finalBuffer);
+
+    results.push({
+      outPath,
+      sourceExt,
+      targetFormat,
+      sizeBytes: finalBuffer.length,
+      usedConversion,
+      warning: igMeta?.warning || null,
+      ...(igMeta ? { sourceLabel: `instagram @${igMeta.author}` } : {}),
+    });
+  }
+
+  return results;
 }
 
 export function readBatchFile(file) {

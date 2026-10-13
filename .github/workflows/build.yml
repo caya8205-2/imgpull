@@ -1,0 +1,151 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os-label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os-label: Windows
+            artifact-name: imgpull-windows
+            imgpull-bin: imgpull.exe
+            shell: pwsh
+          - os: ubuntu-latest
+            os-label: Linux
+            artifact-name: imgpull-linux
+            imgpull-bin: imgpull-linux
+            shell: bash
+          - os: macos-latest
+            os-label: macOS
+            artifact-name: imgpull-macos
+            imgpull-bin: imgpull-macos
+            shell: bash
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "Version: $version"
+
+      - name: Check if release exists
+        id: check_release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if gh api "repos/${{ github.repository }}/releases/tags/v$version" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release v$version already exists. Skipping."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release v$version not found. Will create."
+          fi
+
+      - name: Install dependencies
+        if: steps.check_release.outputs.exists == 'false'
+        run: bun install
+
+      - name: Build binary
+        if: steps.check_release.outputs.exists == 'false'
+        run: bun build --compile --target=bun --outfile=dist/imgpull ./bin/imgpull.js
+
+      - name: Rename artifacts for release
+        if: steps.check_release.outputs.exists == 'false'
+        shell: bash
+        run: |
+          cd dist
+          if [ -f "imgpull.exe" ]; then
+            echo "Windows binary, keeping as imgpull.exe"
+          elif [ -f "imgpull" ]; then
+            mv imgpull "${{ matrix.imgpull-bin }}"
+            echo "Renamed imgpull -> ${{ matrix.imgpull-bin }}"
+          fi
+
+      - name: Upload build artifacts
+        if: steps.check_release.outputs.exists == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: dist/
+          retention-days: 30
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: needs.build.result == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Check if release exists
+        id: check_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if gh api "repos/${{ github.repository }}/releases/tags/v$version" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        if: steps.check_release.outputs.exists == 'false'
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets/
+
+      - name: Collect release files
+        if: steps.check_release.outputs.exists == 'false'
+        run: |
+          mkdir -p release-files
+          find release-assets/ -type f -exec cp {} release-files/ \;
+          ls -la release-files/
+
+      - name: Create Release
+        if: steps.check_release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          gh release create "v$version" \
+            release-files/* \
+            --title "v$version" \
+            --notes "Release v$version" \
+            --generate-notes
