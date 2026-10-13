@@ -1,4 +1,8 @@
 import readline from 'node:readline';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { execSync } from 'node:child_process';
 import { Command } from 'commander';
 import { SUPPORTED_FORMATS, normalizeFormat, processOne, readBatchFile } from './lib.js';
 import { extractShortcode, isInstagramPostUrl, parseNetscapeCookies } from './instagram.js';
@@ -172,6 +176,79 @@ export async function runCli(argv) {
       console.log('');
       log('DONE', c.cyan, `${ok} berhasil, ${fail} gagal.`);
       if (fail > 0) process.exitCode = 1;
+    });
+
+  program
+    .command('uninstall')
+    .description('Hapus imgpull dari sistem (untuk instalasi standalone non-npm)')
+    .action(async () => {
+      if (process.platform === 'win32') {
+        const appDir = path.join(process.env.LOCALAPPDATA || '', 'imgpull');
+        const exeDir = path.dirname(process.execPath);
+
+        if (path.resolve(exeDir) !== path.resolve(appDir)) {
+          log('ERR', c.red, 'imgpull tidak terinstal melalui installer resmi.');
+          log('INFO', c.cyan, 'Jika memakai npm, jalankan: npm uninstall -g imgpull');
+          log('INFO', c.cyan, 'Atau cari lokasinya dengan: Get-Command imgpull');
+          return;
+        }
+
+        log('WARN', c.yellow, 'Tindakan ini akan menghapus imgpull dari sistem.');
+        const answer = await askQuestion('Lanjutkan? [y/N]: ');
+        if (!answer.toLowerCase().startsWith('y')) {
+          log('INFO', c.cyan, 'Dibatalkan.');
+          return;
+        }
+
+        try {
+          execSync(
+            `powershell -Command "$p=[Environment]::GetEnvironmentVariable('PATH','User');$p=($p -split ';'|?{$_ -ne '${appDir.replace(/'/g, "''")}'})-join';';[Environment]::SetEnvironmentVariable('PATH',$p,'User')"`,
+            { stdio: 'pipe' }
+          );
+          log('OK', c.green, 'Dihapus dari User PATH.');
+        } catch (err) {
+          log('WARN', c.yellow, `Gagal update PATH: ${err.message}`);
+        }
+
+        const tmpScript = path.join(os.tmpdir(), 'imgpull-cleanup.bat');
+        const batContent =
+          '@echo off\r\n' +
+          'ping 127.0.0.1 -n 3 > nul\r\n' +
+          'rmdir /s /q "' + appDir + '"\r\n' +
+          'del "' + tmpScript + '"\r\n';
+        fs.writeFileSync(tmpScript, batContent, 'utf-8');
+        execSync(`start /B "" "${tmpScript}"`, { stdio: 'ignore' });
+
+        log('OK', c.green, 'imgpull akan dihapus setelah terminal ini ditutup.');
+        log('INFO', c.cyan, 'Silakan tutup jendela terminal ini.');
+      } else {
+        const binFile = path.join(os.homedir(), '.local', 'bin', 'imgpull');
+        const exeDir = path.dirname(process.execPath);
+
+        if (path.resolve(exeDir) !== path.resolve(path.dirname(binFile))) {
+          log('ERR', c.red, 'imgpull tidak terinstal melalui installer resmi.');
+          log('INFO', c.cyan, 'Jika memakai npm, jalankan: npm uninstall -g imgpull');
+          log('INFO', c.cyan, 'Atau cari lokasinya dengan: which imgpull');
+          return;
+        }
+
+        log('WARN', c.yellow, 'Tindakan ini akan menghapus imgpull dari sistem.');
+        const answer = await askQuestion('Lanjutkan? [y/N]: ');
+        if (!answer.toLowerCase().startsWith('y')) {
+          log('INFO', c.cyan, 'Dibatalkan.');
+          return;
+        }
+
+        try {
+          if (fs.existsSync(binFile)) {
+            fs.unlinkSync(binFile);
+            log('OK', c.green, `Berhasil menghapus ${binFile}`);
+          }
+        } catch (err) {
+          log('ERR', c.red, `Gagal menghapus file binary: ${err.message}`);
+        }
+        log('OK', c.green, 'imgpull berhasil di-uninstall.');
+      }
     });
 
   await program.parseAsync(argv);
