@@ -73,18 +73,18 @@ async function resolveWithOembed(shortcode) {
   });
 
   if (!res.ok) {
-    throw new Error(`Instagram oEmbed error: HTTP ${res.status} (post private atau sudah dihapus)`);
+    throw new Error(`Instagram oEmbed error: HTTP ${res.status} (private post or removed)`);
   }
 
   let data;
   try {
     data = await res.json();
   } catch {
-    throw new Error('Instagram oEmbed mengembalikan respons bukan JSON.');
+    throw new Error('Instagram oEmbed returned non-JSON response.');
   }
 
   if (!data.thumbnail_url) {
-    throw new Error('Gak nemu gambar di postingan IG ini.');
+    throw new Error('No image found in this Instagram post.');
   }
 
   const mediaId = (data.media_id || '').split('_')[0];
@@ -147,7 +147,7 @@ async function resolveWithCookies(mediaId, cookieStr) {
     }
   }
 
-  throw new Error('Gagal mengambil detail carousel via cookie IG.');
+  throw new Error('Failed to fetch carousel details via Instagram cookies.');
 }
 
 /**
@@ -157,7 +157,7 @@ async function resolveWithCookies(mediaId, cookieStr) {
 export async function resolveInstagramImage(postUrl, opts = {}) {
   const sc = extractShortcode(postUrl);
   if (!sc) {
-    throw new Error('Gak bisa ekstrak shortcode dari URL Instagram.');
+    throw new Error('Could not extract shortcode from Instagram URL.');
   }
 
   // 1. Get base info & media_id from oEmbed (always works for public posts)
@@ -184,7 +184,7 @@ export async function resolveInstagramImage(postUrl, opts = {}) {
   // 3. Without cookie or first image requested
   let warning = null;
   if (opts.allImages && !opts.cookies) {
-    warning = 'Postingan carousel memerlukan cookie IG untuk mengunduh semua slide. Mengunduh gambar pertama (cover).';
+    warning = 'Carousel post requires Instagram cookies to download all slides. Downloading first image (cover).';
   }
 
   return {

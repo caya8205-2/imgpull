@@ -2,11 +2,11 @@ import https from 'node:https';
 import fs from 'node:fs';
 import { readConfig, writeConfig } from './config.js';
 
-let currentVersion = '1.1.2';
+let currentVersion = '1.1.3';
 try {
   const pkgUrl = new URL('../package.json', import.meta.url);
   const pkg = JSON.parse(fs.readFileSync(pkgUrl, 'utf8'));
-  currentVersion = pkg.version || '1.1.2';
+  currentVersion = pkg.version || '1.1.3';
 } catch {}
 
 export const CURRENT_VERSION = currentVersion;
@@ -53,20 +53,11 @@ export function isNewer(latestArr, currentArr) {
 }
 
 export function getUpdateCommand() {
-  const execName = (process.execPath || '').split(/[\\/]/).pop().toLowerCase();
-  const isStandalone = execName === 'imgpull.exe' || execName === 'imgpull';
-
-  if (isStandalone) {
-    if (process.platform === 'win32') {
-      return 'irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex';
-    }
-    return 'curl -fsSL https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.sh | bash';
-  }
   return 'npm i -g imgpull@latest';
 }
 
 /**
- * Checks for updates using GitHub Releases with 24-hour cache throttling.
+ * Checks for updates against npm registry with 24-hour cache throttling.
  * Returns update info object if newer version exists, null otherwise.
  */
 export async function checkForUpdates(force = false) {
@@ -89,8 +80,22 @@ export async function checkForUpdates(force = false) {
       return null;
     }
 
-    const release = await fetchJson('https://api.github.com/repos/caya8205-2/imgpull/releases/latest');
-    const latestTag = String(release.tag_name || '').replace(/^v/, '');
+    let latestTag = null;
+    try {
+      const npmData = await fetchJson('https://registry.npmjs.org/imgpull/latest');
+      if (npmData?.version) {
+        latestTag = npmData.version;
+      }
+    } catch {
+      // Fallback to GitHub Releases if npm query fails
+      try {
+        const ghRelease = await fetchJson('https://api.github.com/repos/caya8205-2/imgpull/releases/latest');
+        latestTag = String(ghRelease.tag_name || '').replace(/^v/, '');
+      } catch {}
+    }
+
+    if (!latestTag) return null;
+
     const latest = parseVersion(latestTag);
 
     writeConfig({

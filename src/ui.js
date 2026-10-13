@@ -11,17 +11,17 @@ import { checkForUpdates } from './updater.js';
 const h = React.createElement;
 
 const FORMAT_ITEMS = [
-  { label: 'png   (lossless, transparansi)', value: 'png' },
-  { label: 'jpg   (lossy, gak ada transparansi)', value: 'jpg' },
-  { label: 'webp  (lossy/lossless, modern)', value: 'webp' },
-  { label: 'avif  (lossy, paling kecil)', value: 'avif' },
-  { label: 'tiff  (lossless, buat editing)', value: 'tiff' },
-  { label: 'gif   (animasi/palette terbatas)', value: 'gif' },
+  { label: 'png   (lossless, transparency)', value: 'png' },
+  { label: 'jpg   (lossy, no transparency)', value: 'jpg' },
+  { label: 'webp  (modern, lossy/lossless)', value: 'webp' },
+  { label: 'avif  (smallest size, lossy)', value: 'avif' },
+  { label: 'tiff  (lossless, for editing)', value: 'tiff' },
+  { label: 'gif   (animation, limited palette)', value: 'gif' },
 ];
 
 const IG_SCOPE_ITEMS = [
-  { label: 'Gambar pertama saja (Cover / Thumbnail — Cepat & tanpa cookie)', value: 'first' },
-  { label: 'Semua gambar carousel (Semuanya — Butuh cookie login IG)', value: 'all' },
+  { label: 'First image only (Cover / Thumbnail — fast, no cookies needed)', value: 'first' },
+  { label: 'All carousel images (All — requires Instagram login cookies)', value: 'all' },
 ];
 
 function Header({ updateInfo }) {
@@ -32,14 +32,14 @@ function Header({ updateInfo }) {
       Box,
       { borderStyle: 'round', borderColor: 'cyan', paddingX: 2 },
       h(Text, { color: 'cyan', bold: true }, 'imgpull'),
-      h(Text, { dimColor: true }, '  — download & convert gambar dari URL'),
+      h(Text, { dimColor: true }, '  — download & convert images from URLs'),
     ),
     updateInfo
       ? h(
           Box,
           { borderStyle: 'single', borderColor: 'yellow', paddingX: 1, marginTop: 1, flexDirection: 'column' },
-          h(Text, { color: 'yellow', bold: true }, `★ Update v${updateInfo.latest} tersedia! (versi saat ini: v${updateInfo.current})`),
-          h(Text, { color: 'cyan' }, `  Jalankan: ${updateInfo.command}`),
+          h(Text, { color: 'yellow', bold: true }, `★ Update v${updateInfo.latest} is available! (current: v${updateInfo.current})`),
+          h(Text, { color: 'cyan' }, `  Run: ${updateInfo.command}`),
         )
       : null,
   );
@@ -184,46 +184,46 @@ function App() {
     children.push(
       h(Box, { key: 'urls-list', flexDirection: 'column', marginBottom: 1 },
         urls.length === 0
-          ? h(Text, { dimColor: true }, 'Belum ada URL ditambahin.')
+          ? h(Text, { dimColor: true }, 'No URLs added yet.')
           : urls.map((u, i) => h(Text, { key: i }, h(Text, { color: 'green' }, '+ '), u)),
       ),
       h(Box, { key: 'urls-input' },
-        h(Text, { color: 'cyan' }, urls.length === 0 ? 'URL gambar: ' : 'URL lagi (Enter kosong buat lanjut): '),
+        h(Text, { color: 'cyan' }, urls.length === 0 ? 'Image URL: ' : 'Add another URL (press Enter when done): '),
         h(TextInput, { value: urlInput, onChange: setUrlInput, onSubmit: handleUrlSubmit }),
       ),
     );
   } else if (step === 'ig-scope') {
     children.push(
       h(Box, { key: 'ig-scope-box', flexDirection: 'column', marginBottom: 1 },
-        h(Text, { color: 'yellow', bold: true }, 'Postingan Instagram terdeteksi!'),
-        h(Text, { color: 'cyan', marginBottom: 1 }, 'Mau download gambar pertama atau semuanya?'),
+        h(Text, { color: 'yellow', bold: true }, 'Instagram post detected!'),
+        h(Text, { color: 'cyan', marginBottom: 1 }, 'Download first image only or all carousel slides?'),
         h(SelectInput, { items: IG_SCOPE_ITEMS, onSelect: handleIgScopeSelect }),
       ),
     );
   } else if (step === 'ig-cookie') {
     children.push(
       h(Box, { key: 'ig-cookie-box', flexDirection: 'column' },
-        h(Text, { color: 'cyan' }, 'Path file cookie Netscape (.txt) untuk download semua slide carousel:'),
-        h(Text, { dimColor: true }, '(Kosongkan / tekan Enter untuk lewati)'),
+        h(Text, { color: 'cyan' }, 'Path to Netscape cookie file (.txt) to download all carousel slides:'),
+        h(Text, { dimColor: true }, '(Leave blank / press Enter to skip)'),
         h(TextInput, { value: cookieInput, onChange: setCookieInput, onSubmit: handleCookieSubmit }),
       ),
     );
   } else if (step === 'format') {
     children.push(
-      h(Text, { key: 'format-label', color: 'cyan' }, `${urls.length} URL siap. Pilih format output:`),
+      h(Text, { key: 'format-label', color: 'cyan' }, `${urls.length} URL(s) ready. Select output format:`),
       h(SelectInput, { key: 'format-select', items: FORMAT_ITEMS, onSelect: handleFormatSelect }),
     );
   } else if (step === 'quality') {
     children.push(
       h(Box, { key: 'quality-input' },
-        h(Text, { color: 'cyan' }, 'Quality 1-100 (kosongin buat default): '),
+        h(Text, { color: 'cyan' }, 'Quality 1-100 (leave empty for default): '),
         h(TextInput, { value: qualityInput, onChange: setQualityInput, onSubmit: handleQualitySubmit }),
       ),
     );
   } else if (step === 'output') {
     children.push(
       h(Box, { key: 'output-input' },
-        h(Text, { color: 'cyan' }, 'Folder output: '),
+        h(Text, { color: 'cyan' }, 'Output folder: '),
         h(TextInput, { value: outputInput, onChange: setOutputInput, onSubmit: handleOutputSubmit }),
       ),
     );
@@ -257,8 +257,8 @@ function App() {
       const fail = results.filter((r) => r.status === 'error').length;
       children.push(
         h(Text, { key: 'summary', color: 'cyan', bold: true },
-          `Selesai: ${totalOk} gambar berhasil diunduh, ${fail} URL gagal.  `,
-          h(Text, { dimColor: true }, '(Enter / q buat keluar)'),
+          `Done: ${totalOk} image(s) downloaded successfully, ${fail} failed.  `,
+          h(Text, { dimColor: true }, '(Press Enter or q to exit)'),
         ),
       );
     }
@@ -269,7 +269,7 @@ function App() {
 
 export function runTui() {
   if (!process.stdin.isTTY) {
-    console.error('[ERR] Mode TUI butuh terminal interaktif (TTY). Pake mode flag biasa: imgpull <url> -f jpg');
+    console.error('[ERR] TUI mode requires an interactive terminal (TTY). Use CLI flags: imgpull <url> -f jpg');
     process.exitCode = 1;
     return;
   }

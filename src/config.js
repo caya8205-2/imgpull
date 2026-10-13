@@ -38,7 +38,7 @@ export function getDefaultCookies() {
 export function saveDefaultCookies(filePath) {
   const abs = path.resolve(filePath);
   if (!fs.existsSync(abs)) {
-    throw new Error(`File cookie tidak ditemukan: ${abs}`);
+    throw new Error(`Cookie file not found: ${abs}`);
   }
   writeConfig({ defaultCookies: abs });
   return abs;
