@@ -1,4 +1,4 @@
-name: Build and Release
+name: Test and Release
 
 on:
   push:
@@ -11,97 +11,42 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build (${{ matrix.os-label }})
+  test:
+    name: Test (${{ matrix.os-label }} Node ${{ matrix.node-version }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
             os-label: Windows
-            artifact-name: imgpull-windows
-            imgpull-bin: imgpull.exe
-            shell: pwsh
+            node-version: 20
           - os: ubuntu-latest
             os-label: Linux
-            artifact-name: imgpull-linux
-            imgpull-bin: imgpull-linux
-            shell: bash
+            node-version: 20
           - os: macos-latest
             os-label: macOS
-            artifact-name: imgpull-macos
-            imgpull-bin: imgpull-macos
-            shell: bash
+            node-version: 20
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: ${{ matrix.shell }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
-
-      - name: Read version
-        id: version
-        shell: bash
-        run: |
-          version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "Version: $version"
-
-      - name: Check if release exists
-        id: check_release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          if gh api "repos/${{ github.repository }}/releases/tags/v$version" > /dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Release v$version already exists. Skipping."
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Release v$version not found. Will create."
-          fi
+          node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        if: steps.check_release.outputs.exists == 'false'
-        run: bun install
+        run: npm install
 
-      - name: Build binary
-        if: steps.check_release.outputs.exists == 'false'
-        run: bun build --compile --target=bun --external react-devtools-core --outfile=dist/imgpull ./bin/imgpull.js
-
-      - name: Rename artifacts for release
-        if: steps.check_release.outputs.exists == 'false'
-        shell: bash
-        run: |
-          cd dist
-          if [ -f "imgpull.exe" ]; then
-            echo "Windows binary, keeping as imgpull.exe"
-          elif [ -f "imgpull" ]; then
-            mv imgpull "${{ matrix.imgpull-bin }}"
-            echo "Renamed imgpull -> ${{ matrix.imgpull-bin }}"
-          fi
-
-      - name: Upload build artifacts
-        if: steps.check_release.outputs.exists == 'false'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact-name }}
-          path: dist/
-          retention-days: 30
+      - name: Verify CLI works
+        run: node ./bin/imgpull.js --help
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: test
     runs-on: ubuntu-latest
-    if: needs.build.result == 'success'
 
     steps:
       - name: Checkout code
@@ -124,19 +69,6 @@ jobs:
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
-
-      - name: Download all artifacts
-        if: steps.check_release.outputs.exists == 'false'
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets/
-
-      - name: Collect release files
-        if: steps.check_release.outputs.exists == 'false'
-        run: |
-          mkdir -p release-files
-          find release-assets/ -type f -exec cp {} release-files/ \;
-          ls -la release-files/
 
       - name: Create Release
         if: steps.check_release.outputs.exists == 'false'
@@ -145,7 +77,8 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           gh release create "v$version" \
-            release-files/* \
+            scripts/install.ps1 \
+            scripts/install.sh \
             --title "v$version" \
             --notes "Release v$version" \
             --generate-notes

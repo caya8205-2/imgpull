@@ -43,23 +43,21 @@ $packageJson = Get-Content "package.json" -Raw | ConvertFrom-Json
 $packageJson.version = $Version
 $packageJson | ConvertTo-Json -Depth 100 | Set-Content "package.json"
 
-# Build with Bun
-Write-Host "🔨 Building binary with Bun..." -ForegroundColor Green
-bun run build
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Build failed!" -ForegroundColor Red
-    exit 1
-}
+# Update updater.js fallback version
+$updaterJs = Get-Content "src/updater.js" -Raw
+$updaterJs = $updaterJs -replace "let currentVersion = '[^']+';", "let currentVersion = '$Version';"
+$updaterJs | Set-Content "src/updater.js"
 
-# Verify artifacts
-Write-Host "✅ Verifying artifacts..." -ForegroundColor Green
-if (!(Test-Path "dist/imgpull.exe") -and !(Test-Path "dist/imgpull")) {
-    Write-Host "❌ imgpull binary not found in dist/" -ForegroundColor Red
+# Verify CLI runs cleanly
+Write-Host "🔨 Verifying CLI runs cleanly..." -ForegroundColor Green
+node ./bin/imgpull.js --version
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ CLI verification failed!" -ForegroundColor Red
     exit 1
 }
 
 Write-Host ""
-Write-Host "✨ Build successful!" -ForegroundColor Green
+Write-Host "✨ Release preparation successful!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "1. Review changes: git diff" -ForegroundColor White
