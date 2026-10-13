@@ -6,8 +6,7 @@ param(
 )
 
 $AppDir = "$env:LOCALAPPDATA\imgpull"
-$CmdPath = Join-Path $AppDir 'imgpull.cmd'
-$Ps1Path = Join-Path $AppDir 'imgpull.ps1'
+$BinPath = Join-Path $AppDir 'imgpull.exe'
 
 function Checkmark {
   param([string]$Text)
@@ -32,6 +31,15 @@ function RemoveFromPath {
   }
 }
 
+function Dl($url, $out) {
+  $name = Split-Path $url -Leaf
+  Write-Host "  Downloading $name ..." -NoNewline
+  $wc = New-Object System.Net.WebClient
+  $wc.DownloadFile($url, $out)
+  Write-Host " " -NoNewline
+  Checkmark "Downloaded $name"
+}
+
 function DoUninstall {
   Write-Host "Removing imgpull ..." -ForegroundColor Yellow
   if (Test-Path $AppDir) { Remove-Item $AppDir -Recurse -Force; Checkmark "Removed $AppDir" }
@@ -43,21 +51,8 @@ function DoUninstall {
 # ── Uninstall flow ────────────────────────────────────────
 if ($Uninstall) { DoUninstall; return }
 
-# ── Prerequisite checks ───────────────────────────────────
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Write-Host "ERROR: Node.js is required to run imgpull." -ForegroundColor Red
-  Write-Host "Please install Node.js 18+ from https://nodejs.org or run:" -ForegroundColor Yellow
-  Write-Host "  winget install OpenJS.NodeJS" -ForegroundColor Cyan
-  exit 1
-}
-
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-  Write-Host "ERROR: npm is required to install imgpull." -ForegroundColor Red
-  exit 1
-}
-
 # ── Already installed? ────────────────────────────────────
-if (Test-Path $CmdPath) {
+if (Test-Path $BinPath) {
   Write-Host "imgpull is already installed." -ForegroundColor Yellow
   Write-Host "  [U]ninstall   - remove imgpull"
   Write-Host "  [R]einstall   - overwrite files"
@@ -68,49 +63,40 @@ if (Test-Path $CmdPath) {
 }
 
 # ── Install flow ──────────────────────────────────────────
-Write-Host "Installing imgpull to $AppDir ..." -ForegroundColor Cyan
 if (-not (Test-Path $AppDir)) { New-Item -ItemType Directory -Path $AppDir -Force | Out-Null }
 
-# Clean up legacy broken binary if present
-$legacyExe = Join-Path $AppDir 'imgpull.exe'
-if (Test-Path $legacyExe) { Remove-Item $legacyExe -Force -ErrorAction SilentlyContinue }
+$scriptPath = if ($MyInvocation.MyCommand.Path) { Split-Path $MyInvocation.MyCommand.Path -Parent } else { $null }
+$localExe = if ($scriptPath) { Join-Path $scriptPath 'imgpull.exe' } else { $null }
 
-# Check if npm package exists or fallback to GitHub
-$pkgSpec = if ($Version -eq "latest") { "imgpull" } else { "imgpull@$Version" }
-$published = $false
-try {
-  $null = npm view $pkgSpec version 2>$null
-  if ($LASTEXITCODE -eq 0) { $published = $true }
-} catch {}
+if ($localExe -and (Test-Path $localExe)) {
+  Write-Host "Installing from local files ..." -ForegroundColor Cyan
+  Copy-Item -LiteralPath $localExe -Destination $BinPath -Force
+  Checkmark "Copied imgpull.exe"
+} else {
+  Write-Host "Fetching release info from GitHub ..." -ForegroundColor Cyan
 
-if (-not $published) {
-  # Fallback to GitHub repository until published to npm registry
-  $pkgSpec = "https://github.com/$RepoOwner/$RepoName.git"
+  if ($Version -eq "latest") {
+    $apiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
+  } else {
+    $apiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/tags/$Version"
+  }
+
+  try {
+    $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ "User-Agent" = "imgpull-installer" }
+    $baseUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$($release.tag_name)"
+
+    Checkmark "Found release $($release.tag_name)"
+    Dl "$baseUrl/imgpull.exe" $BinPath
+  } catch {
+    Write-Host ""
+    Write-Host "ERROR: Failed to fetch release from GitHub." -ForegroundColor Red
+    Write-Host "Make sure the repository has published releases." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "You can also download manually from:" -ForegroundColor Cyan
+    Write-Host "https://github.com/$RepoOwner/$RepoName/releases" -ForegroundColor White
+    exit 1
+  }
 }
-
-Write-Host "  Installing package ($pkgSpec) via npm ..." -ForegroundColor Cyan
-$installOutput = npm install --prefix "$AppDir" "$pkgSpec" 2>&1
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "ERROR: Failed to install imgpull dependencies." -ForegroundColor Red
-  Write-Host $installOutput
-  exit 1
-}
-Checkmark "Installed package and dependencies"
-
-# Create imgpull.cmd wrapper
-$cmdContent = @'
-@echo off
-node "%~dp0node_modules\imgpull\bin\imgpull.js" %*
-'@
-Set-Content -Path $CmdPath -Value $cmdContent -Encoding ASCII
-Checkmark "Created imgpull.cmd launcher"
-
-# Create imgpull.ps1 wrapper
-$ps1Content = @'
-& node "$PSScriptRoot\node_modules\imgpull\bin\imgpull.js" @args
-'@
-Set-Content -Path $Ps1Path -Value $ps1Content -Encoding UTF8
-Checkmark "Created imgpull.ps1 launcher"
 
 AddToPath
 Write-Host ""
@@ -119,4 +105,4 @@ Write-Host ""
 Write-Host "Installed to:" -ForegroundColor Cyan
 Write-Host "  $AppDir" -ForegroundColor White
 Write-Host ""
-Write-Host "Open a new terminal and run: imgpull" -ForegroundColor Green
+Write-Host "Open a new terminal and run: imgpull --help" -ForegroundColor White

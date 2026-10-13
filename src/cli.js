@@ -180,17 +180,15 @@ export async function runCli(argv) {
 
   program
     .command('uninstall')
-    .description('Hapus imgpull dari sistem (untuk instalasi standalone / installer one-line)')
+    .description('Hapus imgpull dari sistem (untuk instalasi standalone)')
     .action(async () => {
-      const entryScript = path.resolve(process.argv[1] || '');
-
       if (process.platform === 'win32') {
         const appDir = path.join(process.env.LOCALAPPDATA || '', 'imgpull');
-        const isInstallerPath = entryScript.toLowerCase().startsWith(path.resolve(appDir).toLowerCase());
+        const exeDir = path.dirname(process.execPath);
 
-        if (!isInstallerPath) {
-          log('ERR', c.red, 'imgpull tidak terinstal melalui installer one-line.');
-          log('INFO', c.cyan, 'Jika memakai npm global, jalankan: npm uninstall -g imgpull');
+        if (path.resolve(exeDir) !== path.resolve(appDir)) {
+          log('ERR', c.red, 'imgpull tidak terinstal melalui installer resmi.');
+          log('INFO', c.cyan, 'Jika memakai npm, jalankan: npm uninstall -g imgpull');
           log('INFO', c.cyan, 'Atau cari lokasinya dengan: Get-Command imgpull');
           return;
         }
@@ -224,13 +222,13 @@ export async function runCli(argv) {
         log('OK', c.green, 'imgpull akan dihapus setelah terminal ini ditutup.');
         log('INFO', c.cyan, 'Silakan tutup jendela terminal ini.');
       } else {
-        const appDir = path.join(os.homedir(), '.local', 'share', 'imgpull');
-        const binFile = path.join(os.homedir(), '.local', 'bin', 'imgpull');
-        const isInstallerPath = entryScript.startsWith(path.resolve(appDir));
+        const appDir = path.join(os.homedir(), '.local', 'bin');
+        const binFile = path.join(appDir, 'imgpull');
+        const exeDir = path.dirname(process.execPath);
 
-        if (!isInstallerPath) {
-          log('ERR', c.red, 'imgpull tidak terinstal melalui installer one-line.');
-          log('INFO', c.cyan, 'Jika memakai npm global, jalankan: npm uninstall -g imgpull');
+        if (path.resolve(exeDir) !== path.resolve(appDir)) {
+          log('ERR', c.red, 'imgpull tidak terinstal melalui installer resmi.');
+          log('INFO', c.cyan, 'Jika memakai npm, jalankan: npm uninstall -g imgpull');
           log('INFO', c.cyan, 'Atau cari lokasinya dengan: which imgpull');
           return;
         }
@@ -243,17 +241,13 @@ export async function runCli(argv) {
         }
 
         try {
-          if (fs.existsSync(appDir)) {
-            fs.rmSync(appDir, { recursive: true, force: true });
-          }
           if (fs.existsSync(binFile)) {
             fs.unlinkSync(binFile);
           }
-          log('OK', c.green, 'Berhasil menghapus file instalasi.');
+          log('OK', c.green, 'imgpull berhasil di-uninstall.');
         } catch (err) {
-          log('ERR', c.red, `Gagal menghapus file instalasi: ${err.message}`);
+          log('ERR', c.red, `Gagal menghapus binary: ${err.message}`);
         }
-        log('OK', c.green, 'imgpull berhasil di-uninstall.');
       }
     });
 

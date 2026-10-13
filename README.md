@@ -30,7 +30,7 @@ npx imgpull "https://example.com/image.webp" -f png
 powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex"
 ```
 
-This installs `imgpull` into `%LOCALAPPDATA%\imgpull` and adds it to your user PATH.
+This downloads and installs `imgpull.exe` from the latest GitHub Release to `%LOCALAPPDATA%\imgpull` and adds it to your user PATH.
 
 ### Option 2: One-line Install (Linux & macOS)
 
@@ -38,7 +38,7 @@ This installs `imgpull` into `%LOCALAPPDATA%\imgpull` and adds it to your user P
 curl -fsSL https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.sh | bash
 ```
 
-This installs `imgpull` into `~/.local/share/imgpull` with a launcher at `~/.local/bin/imgpull` and adds it to your shell configuration (`~/.bashrc`, `~/.zshrc`, etc.).
+This detects your operating system and architecture, downloads the release binary to `~/.local/bin`, and adds it to your shell configuration (`~/.bashrc`, `~/.zshrc`, etc.).
 
 ### Option 3: npm (Cross-platform)
 
