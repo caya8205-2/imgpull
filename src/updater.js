@@ -58,7 +58,7 @@ export function getUpdateCommand() {
 
   if (isStandalone) {
     if (process.platform === 'win32') {
-      return 'powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex"';
+      return 'irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex';
     }
     return 'curl -fsSL https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.sh | bash';
   }

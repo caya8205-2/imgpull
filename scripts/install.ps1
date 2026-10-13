@@ -34,8 +34,7 @@ function RemoveFromPath {
 function Dl($url, $out) {
   $name = Split-Path $url -Leaf
   Write-Host "  Downloading $name ..." -NoNewline
-  $wc = New-Object System.Net.WebClient
-  $wc.DownloadFile($url, $out)
+  Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
   Write-Host " " -NoNewline
   Checkmark "Downloaded $name"
 }

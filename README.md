@@ -26,8 +26,14 @@ npx imgpull "https://example.com/image.webp" -f png
 
 ### Option 1: One-line Install (Windows)
 
+In PowerShell:
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex"
+irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex
+```
+
+Or in CMD:
+```cmd
+powershell -c "irm https://raw.githubusercontent.com/caya8205-2/imgpull/main/scripts/install.ps1 | iex"
 ```
 
 This downloads and installs `imgpull.exe` from the latest GitHub Release to `%LOCALAPPDATA%\imgpull` and adds it to your user PATH.
