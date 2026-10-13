@@ -20,7 +20,7 @@ function AddToPath {
     [Environment]::SetEnvironmentVariable('PATH', "$AppDir;$current", 'User')
     Checkmark "Added to PATH (user-level)"
   } else {
-    Write-Host "  ✓ PATH already contains imgpull" -ForegroundColor Cyan
+    Write-Host "  >> PATH already contains imgpull" -ForegroundColor Cyan
   }
 }
 
@@ -98,12 +98,17 @@ if ($LASTEXITCODE -ne 0) {
 Checkmark "Installed package and dependencies"
 
 # Create imgpull.cmd wrapper
-$cmdContent = "@echo off`r`nnode `"%~dp0node_modules\imgpull\bin\imgpull.js`" %*"
+$cmdContent = @'
+@echo off
+node "%~dp0node_modules\imgpull\bin\imgpull.js" %*
+'@
 Set-Content -Path $CmdPath -Value $cmdContent -Encoding ASCII
 Checkmark "Created imgpull.cmd launcher"
 
 # Create imgpull.ps1 wrapper
-$ps1Content = "& node `"`$PSScriptRoot\node_modules\imgpull\bin\imgpull.js`" @args"
+$ps1Content = @'
+& node "$PSScriptRoot\node_modules\imgpull\bin\imgpull.js" @args
+'@
 Set-Content -Path $Ps1Path -Value $ps1Content -Encoding UTF8
 Checkmark "Created imgpull.ps1 launcher"
 
