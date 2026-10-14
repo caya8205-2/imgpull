@@ -1,30 +1,26 @@
-name: Publish to npm
+name: Release and Publish
 
 on:
   push:
-    tags:
-      - 'v*'
-  release:
-    types: [published]
+    branches: [main, master]
+    paths:
+      - 'package.json'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (leave empty for package.json version)'
-        required: false
-        type: string
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  publish:
-    name: Publish to npm Registry
+  release:
+    name: Check Version, Release & Publish
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,37 +28,59 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Read version and check tag existence
+        id: version_check
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+          if gh release view "$tag" > /dev/null 2>&1 || git rev-parse "$tag" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release or tag $tag already exists. Skipping."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "New version detected ($tag). Proceeding to build, release, and publish."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install dependencies
+        if: steps.version_check.outputs.exists == 'false'
         run: npm install
 
-      - name: Test CLI execution
-        run: node ./bin/imgpull.js --help
+      - name: Run tests
+        if: steps.version_check.outputs.exists == 'false'
+        run: npm test
 
-      - name: Update version (if specified via workflow dispatch)
-        if: github.event.inputs.version
-        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+      - name: Create Git Tag & GitHub Release
+        if: steps.version_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.version_check.outputs.tag }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
+
+          gh release create "$tag" \
+            --title "$tag" \
+            --generate-notes
 
       - name: Publish to npm
+        if: steps.version_check.outputs.exists == 'false'
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Get package info
-        id: package
-        run: |
-          echo "name=$(node -p "require('./package.json').name")" >> $GITHUB_OUTPUT
-          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
       - name: Create summary
+        if: steps.version_check.outputs.exists == 'false'
         run: |
-          echo "### 📦 Published to npm" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Released & Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package:** \`${{ steps.package.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** \`${{ steps.package.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "npm install -g ${{ steps.package.outputs.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**npm page:** https://www.npmjs.com/package/${{ steps.package.outputs.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** \`${{ steps.version_check.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release:** [${{ steps.version_check.outputs.tag }}](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_check.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **npm:** https://www.npmjs.com/package/imgpull" >> $GITHUB_STEP_SUMMARY
