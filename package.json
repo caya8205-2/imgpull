@@ -1,6 +1,6 @@
 {
   "name": "imgpull",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "CLI tool to download images directly from URLs and auto-convert from webp (or any format) to png/jpg/etc., without third-party downloader sites or ImageMagick.",
   "type": "module",
   "bin": {
@@ -41,7 +41,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node ./bin/imgpull.js --help",
+    "test": "node test.js",
     "prepublishOnly": "echo 'Ready to publish to npm'"
   },
   "dependencies": {

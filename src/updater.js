@@ -2,11 +2,11 @@ import https from 'node:https';
 import fs from 'node:fs';
 import { readConfig, writeConfig } from './config.js';
 
-let currentVersion = '1.1.3';
+let currentVersion = '1.1.4';
 try {
   const pkgUrl = new URL('../package.json', import.meta.url);
   const pkg = JSON.parse(fs.readFileSync(pkgUrl, 'utf8'));
-  currentVersion = pkg.version || '1.1.3';
+  currentVersion = pkg.version || '1.1.4';
 } catch {}
 
 export const CURRENT_VERSION = currentVersion;
